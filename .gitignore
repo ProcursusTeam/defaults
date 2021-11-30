@@ -1,2 +1,5 @@
 bin/
 .DS_Store
+defaults
+compile_commands.json
+.cache
