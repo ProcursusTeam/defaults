@@ -1,5 +1,33 @@
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * Copyright (c) 2020-present quiprr
+ * Modified work Copyright (c) 2021 ProcursusTeam
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+const unsigned char defaultsVersionString[] = "@(#)PROGRAM:defaults  PROJECT:defaults-1.0  BUILT:" __DATE__ " " __TIME__ "\n";
+
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
+#include <stdio.h>
 
 void usage()
 {
@@ -51,22 +79,20 @@ void usage()
 int main(int argc, char *argv[], char *envp[])
 {
 	@autoreleasepool {
-		NSMutableArray <NSString *> *arguments = [[[NSProcessInfo processInfo] arguments] mutableCopy];
+		NSMutableArray <NSString *> *args = [[[NSProcessInfo processInfo] arguments] mutableCopy];
 
-		if (arguments.count == 1 || (arguments.count >= 2 && [arguments[1] isEqualToString:@"help"])) {
+		if (args.count == 1 || (args.count >= 2 && [args[1] isEqualToString:@"help"])) {
 			usage();
-			return arguments.count == 1 ? 1 : 0;
+			return args.count == 1 ? 1 : 0;
 		}
 
-		if (arguments.count >= 2 && [arguments[1] isEqualToString:@"domains"]) {
+		if ([args[1] isEqualToString:@"domains"]) {
 			NSMutableArray *domains = [(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost) mutableCopy];
 			[domains removeObjectAtIndex:[domains indexOfObject:(id)kCFPreferencesAnyApplication]];
 			[domains sortUsingSelector:@selector(compare:)];
 			printf("%s\n", [domains componentsJoinedByString:@", "].UTF8String);
 			return 0;
-		}
-
-		if (arguments.count == 2 && [arguments[1] isEqualToString:@"read"]) {
+		} else if (args.count == 2 && [args[1] isEqualToString:@"read"]) {
 			NSArray *prefs = (__bridge_transfer NSArray *)
 				CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			NSMutableDictionary *out = [NSMutableDictionary new];
@@ -78,71 +104,82 @@ int main(int argc, char *argv[], char *envp[])
 			return 0;
 		}
 
-		if (arguments.count < 3) {
-			//usage();
-			return 2;
+		NSString *appid;
+
+		if (args.count >= 2 && ![args[1] isEqualToString:@"find"]) {
+			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"])
+				appid = (__bridge NSString*)kCFPreferencesAnyApplication;
+			else if ([args[2] isEqualToString:@"-app"]) {
+				appid = @"com.apple.Preferences";
+				[args removeObjectAtIndex:2];
+			} else {
+				if ([(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost) indexOfObject:args[2]] == NSNotFound) {
+					fprintf(stderr, "Domain %s does not exist\n", args[2].UTF8String);
+					return 1;
+				}
+				appid = args[2];
+			}
 		}
 
-		if ([arguments[1] isEqualToString:@"read"])
-		{
+		if ([args[1] isEqualToString:@"read"]) {
 			NSDictionary *result = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(NULL,
-					([arguments[2] isEqualToString:@"-g"] || [arguments[2] isEqualToString:@"-globalDomain"]) ?
-					 kCFPreferencesAnyApplication : (__bridge CFStringRef)arguments[2],
-					 kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 
-			if (arguments.count == 3)
-			{
+			if (args.count == 3) {
 				printf("%s\n", result.description.UTF8String);
 				return 0;
 			} else {
-				printf("%s\n", [[result objectForKey:arguments[3]] description].UTF8String);
+				if ([result objectForKey:args[3]] == nil) {
+					fprintf(stderr, "The domain/default pair of (%s, %s) does not exist\n", appid.UTF8String, args[3].UTF8String);
+					return 1;
+				}
+				printf("%s\n", [[result objectForKey:args[3]] description].UTF8String);
 				return 0;
 			}
 		}
-		else if ([arguments[1] isEqualToString:@"write"] && (arguments.count == 5 || arguments.count == 6))
+
+		if ([args[1] isEqualToString:@"write"] && (args.count == 5 || args.count == 6))
 		{
-			CFStringRef appid = ([arguments[2] isEqualToString:@"-g"] || [arguments[2] isEqualToString:@"-globalDomain"]) ?
-					 kCFPreferencesAnyApplication : (__bridge CFStringRef)arguments[2];
-			NSString *key = arguments[3];
-			NSString *type = arguments.count == 5 ? @"-string" : arguments[4];
-			NSString *value = arguments.count == 5 ? arguments[4] : arguments[5];
+			NSString *key = args[3];
+			NSString *type = args.count == 5 ? @"-string" : args[4];
+			NSString *value = args.count == 5 ? args[4] : args[5];
 
 			if ([type isEqualToString:@"-i"] ||
 					[type isEqualToString:@"-int"] ||
 					[type isEqualToString:@"-integer"]) {
 				CFPreferencesSetValue((__bridge CFStringRef)key,
 						(__bridge CFNumberRef)@([value integerValue]),
-						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			}
 			else if ([type isEqualToString:@"-f"] || [type isEqualToString:@"-float"])
 			{
 				CFPreferencesSetValue((__bridge CFStringRef)key,
 						(__bridge CFNumberRef)@([value floatValue]),
-						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			}
 			else if ([type isEqualToString:@"-b"] || [type isEqualToString:@"-bool"] || [type isEqualToString:@"-boolean"])
 			{
 				CFPreferencesSetValue((__bridge CFStringRef)key,
 						(__bridge CFBooleanRef)@([value boolValue]),
-						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			}
 			else if ([type isEqualToString:@"-s"] || [type isEqualToString:@"-string"])
 			{
 				CFPreferencesSetValue((__bridge CFStringRef)key,
 						(__bridge CFStringRef)value,
-						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			}
 			else if ([type isEqualToString:@"-date"])
 			{
 				CFPreferencesSetValue((__bridge CFStringRef)key,
 						(__bridge CFDateRef)[[NSDateFormatter alloc] dateFromString:value],
-						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			} else {
 				printf("Unrecognized type `%s`. For help, use `defaults help`.\n", [type UTF8String]);
 				return 3;
 			}
 
-			return CFPreferencesSynchronize(appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
+			return CFPreferencesSynchronize((__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
 		}
 	}
 }
