@@ -52,8 +52,8 @@ void usage()
 	printf("\n");
 	// TODO: printf("  import <domain> <path to plist>      writes the plist at path to domain\n");
 	// TODO: printf("  import <domain> -                    writes a plist from stdin to domain\n");
-	// TODO: printf("  export <domain> <path to plist>      saves domain as a binary plist to path\n");
-	// TODO: printf("  export <domain> -                    writes domain as an xml plist to stdout\n");
+	printf("  export <domain> <path to plist>      saves domain as a binary plist to path\n");
+	printf("  export <domain> -                    writes domain as an xml plist to stdout\n");
 	printf("  domains                              lists all domains\n");
 	// TODO: printf("  find <word>                          lists all entries containing word\n");
 	printf("  help                                 print this help\n");
@@ -173,6 +173,47 @@ int main(int argc, char *argv[], char *envp[])
 				printf("Found a value that is not of a known property list type\n");
 			}
 			CFRelease(result);
+			return 0;
+		}
+
+		if ([args[1] isEqualToString:@"export"]) {
+			if (args.count == 3) {
+				fprintf(stderr, "Need a path to write to\n");
+				return 1;
+			}
+			NSArray *keys = (__bridge_transfer NSArray*)CFPreferencesCopyKeyList((__bridge CFStringRef)appid,
+					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			NSDictionary *out = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(
+					(__bridge CFArrayRef)keys, (__bridge CFStringRef)appid,
+					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			if (out == 0) {
+				fprintf(stderr, "The domain %s does not exist\n", appid.UTF8String);
+				return 1;
+			}
+			NSError *error;
+			NSPropertyListFormat format = NSPropertyListBinaryFormat_v1_0;
+			NSURL *outURL;
+			if ([args[3] isEqualToString:@"-"]) {
+				format = NSPropertyListXMLFormat_v1_0;
+			}
+
+			NSData *outData = [NSPropertyListSerialization dataWithPropertyList:out
+																								 format:format
+																								options:0
+																									error:&error];
+
+			if (error) {
+				fprintf(stderr, "Could not export domain %s to %s due to %s\n",
+						appid.UTF8String,
+						args[3].UTF8String,
+						error.localizedDescription.UTF8String);
+				return 1;
+			}
+			if (format == NSPropertyListXMLFormat_v1_0) {
+				NSFileHandle *fh = [NSFileHandle fileHandleWithStandardOutput];
+				[fh writeData:outData];
+			} else
+				[outData writeToFile:args[3] atomically:true];
 			return 0;
 		}
 
