@@ -1,17 +1,19 @@
-.PHONY: clean all
+CC      ?= xcrun cc
+CFLAGS  ?= -O2
+LDFLAGS ?= -O2
 
-CC_MAC := xcrun --sdk macosx clang
-CC_IOS := xcrun --sdk iphoneos clang -miphoneos-version-min=10.0
-CFLAGS := -O2 -arch arm64 -fobjc-arc
-LIBS   := -framework Foundation
-SIGN   := ldid -Sent.plist
+SRC := Sources/defaults.m
+
+all: defaults
+
+defaults: $(SRC:%=%.o)
+	$(CC) $(LDFLAGS) -o $@ $< -framework CoreFoundation -fobjc-arc
+	-ldid -Sent.plist $@
+
+%.m.o: %.m
+	$(CC) $(CFLAGS) -c -o $@ $< -fobjc-arc
 
 clean:
-	rm -rf bin/
+	rm -rf defaults defaults.dSYM $(SRC:%=%.o)
 
-ios:
-	$(CC_IOS) $(CFLAGS) Sources/defaults.m -o bin/defaults $(LIBS)
-	$(SIGN) bin/defaults
-
-macos:
-	$(CC_MAC) $(CFLAGS) Sources/defaults.m -o bin/defaults $(LIBS)
+.PHONY: clean all

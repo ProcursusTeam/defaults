@@ -40,7 +40,7 @@ void usage()
 	printf("  read <domain>                        shows defaults for given domain\n");
 	printf("  read <domain> <key>                  shows defaults for given domain, key\n");
 	printf("\n");
-	// TODO: printf("  read-type <domain> <key>             shows the type for the given domain, key\n");
+	printf("  read-type <domain> <key>             shows the type for the given domain, key\n");
 	printf("\n");
 	// TODO: printf("  write <domain> <domain_rep>          writes domain (overwrites existing)\n");
 	printf("  write <domain> <key> <value>         writes key for domain\n");
@@ -106,7 +106,7 @@ int main(int argc, char *argv[], char *envp[])
 
 		NSString *appid;
 
-		if (args.count >= 2 && ![args[1] isEqualToString:@"find"]) {
+		if (args.count >= 3 && ![args[1] isEqualToString:@"find"]) {
 			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"])
 				appid = (__bridge NSString*)kCFPreferencesAnyApplication;
 			else if ([args[2] isEqualToString:@"-app"]) {
@@ -130,12 +130,51 @@ int main(int argc, char *argv[], char *envp[])
 				return 0;
 			} else {
 				if ([result objectForKey:args[3]] == nil) {
-					fprintf(stderr, "The domain/default pair of (%s, %s) does not exist\n", appid.UTF8String, args[3].UTF8String);
+					fprintf(stderr, "The domain/default pair of (%s, %s) does not exist\n",
+							appid.UTF8String, args[3].UTF8String);
 					return 1;
 				}
 				printf("%s\n", [[result objectForKey:args[3]] description].UTF8String);
 				return 0;
 			}
+		}
+
+		if (args.count >= 4 && [args[1] isEqualToString:@"read-type"]) {
+			CFPropertyListRef result = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			if (result == NULL) {
+				fprintf(stderr, "The domain/default pair of (%s, %s) does not exist\n",
+						appid.UTF8String, args[3].UTF8String);
+				return 1;
+			}
+			CFTypeID type = CFGetTypeID(result);
+			if (type == CFStringGetTypeID()) {
+				printf("Type is string\n");
+			} else if (type == CFDataGetTypeID()) {
+				printf("Type is data\n");
+			} else if (type == CFNumberGetTypeID()) {
+				if (CFNumberIsFloatType(result))
+					printf("Type is float\n");
+				else
+					printf("Type is integer\n");
+			} else if (type == CFBooleanGetTypeID()) {
+				printf("Type is boolean\n");
+			} else if (type == CFDateGetTypeID()) {
+				printf("Type is date\n");
+			} else if (type == CFArrayGetTypeID()) {
+				printf("Type is array\n");
+			} else if (type == CFDictionaryGetTypeID()) {
+				printf("Type is dictionary\n");
+			} else {
+				printf("Found a value that is not of a known property list type\n");
+			}
+			CFRelease(result);
+			return 0;
+		}
+
+		if ([args[1] isEqualToString:@"write"] && args.count == 2) {
+			usage();
+			return 1;
 		}
 
 		if ([args[1] isEqualToString:@"write"] && (args.count == 5 || args.count == 6))
@@ -181,5 +220,8 @@ int main(int argc, char *argv[], char *envp[])
 
 			return CFPreferencesSynchronize((__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
 		}
+
+		usage();
+		return 1;
 	}
 }
