@@ -1,4 +1,4 @@
-#import <CoreFoundation/CFPreferences.h>
+#import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
 
 @interface NSUserDefaults (defaults)
@@ -50,12 +50,13 @@ void usage()
 	printf("  -array-add <value1> <value2> ...\n");
 	printf("  -dict <key1> <value1> <key2> <value2> ...\n");
 	printf("  -dict-add <key1> <value1> ...\n");
+	printf("\nContact the Procursus Team for support.\n");
 }
 
 int main(int argc, char *argv[], char *envp[])
 {
 	@autoreleasepool {
-		NSArray <NSString *> *arguments = [[NSProcessInfo processInfo] arguments];
+		NSMutableArray <NSString *> *arguments = [[[NSProcessInfo processInfo] arguments] mutableCopy];
 
 		if (arguments.count >= 2 && [arguments[1] isEqualToString:@"domains"]) {
 			NSMutableArray *domains = [(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost) mutableCopy];
@@ -65,60 +66,83 @@ int main(int argc, char *argv[], char *envp[])
 			return 0;
 		}
 
-		if (arguments.count < 3)
-		{
-			usage();
+		if (arguments.count == 2 && [arguments[1] isEqualToString:@"read"]) {
+			NSArray *prefs = (__bridge_transfer NSArray *)
+				CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			NSMutableDictionary *out = [NSMutableDictionary new];
+			for (NSString *domain in prefs) {
+				[out setObject:(__bridge_transfer NSDictionary*)CFPreferencesCopyMultiple(NULL, (__bridge CFStringRef)domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+								forKey:[domain isEqualToString:(__bridge NSString *)kCFPreferencesAnyApplication] ? @"Apple Global Domain" : domain];
+			}
+			printf("%s\n", [NSString stringWithFormat:@"%@", out].UTF8String);
+			return 0;
+		}
+
+		if (arguments.count < 3) {
+			//usage();
 			return 2;
 		}
 
-		NSString *domain = arguments[2];
-		if ([domain isEqualToString:@"-globalDomain"] || [domain isEqualToString:@"-g"])
+		if ([arguments[1] isEqualToString:@"read"])
 		{
-			domain = @".GlobalPreferences";
-		}
+			NSDictionary *result = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(NULL,
+					([arguments[2] isEqualToString:@"-g"] || [arguments[2] isEqualToString:@"-globalDomain"]) ?
+					 kCFPreferencesAnyApplication : (__bridge CFStringRef)arguments[2],
+					 kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 
-		NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:domain];
-		NSString *action = arguments[1];
-
-		if ([action isEqualToString:@"read"])
-		{
-			NSString *value = arguments.count < 4 ? defaults.dictionaryRepresentation : [defaults objectForKey:arguments[3]];
-
-			if (value)
+			if (arguments.count == 3)
 			{
-				printf("%s\n", value.description.UTF8String);
+				printf("%s\n", result.description.UTF8String);
 				return 0;
 			} else {
-				return 1;
+				printf("%s\n", [[result objectForKey:arguments[3]] description].UTF8String);
+				return 0;
 			}
 		}
-		else if ([action isEqualToString:@"write"] && (arguments.count == 5 || arguments.count == 6))
+		else if ([arguments[1] isEqualToString:@"write"] && (arguments.count == 5 || arguments.count == 6))
 		{
+			CFStringRef appid = ([arguments[2] isEqualToString:@"-g"] || [arguments[2] isEqualToString:@"-globalDomain"]) ?
+					 kCFPreferencesAnyApplication : (__bridge CFStringRef)arguments[2];
 			NSString *key = arguments[3];
 			NSString *type = arguments.count == 5 ? @"-string" : arguments[4];
 			NSString *value = arguments.count == 5 ? arguments[4] : arguments[5];
 
-			if ([type isEqualToString:@"-i"] || [type isEqualToString:@"-int"] || [type isEqualToString:@"-integer"])
-			{
-				[defaults setInteger:value.integerValue forKey:key];
+			if ([type isEqualToString:@"-i"] ||
+					[type isEqualToString:@"-int"] ||
+					[type isEqualToString:@"-integer"]) {
+				CFPreferencesSetValue((__bridge CFStringRef)key,
+						(__bridge CFNumberRef)@([value integerValue]),
+						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			}
 			else if ([type isEqualToString:@"-f"] || [type isEqualToString:@"-float"])
 			{
-				[defaults setFloat:value.floatValue forKey:key];
+				CFPreferencesSetValue((__bridge CFStringRef)key,
+						(__bridge CFNumberRef)@([value floatValue]),
+						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			}
 			else if ([type isEqualToString:@"-b"] || [type isEqualToString:@"-bool"] || [type isEqualToString:@"-boolean"])
 			{
-				[defaults setBool:value.boolValue forKey:key];
+				CFPreferencesSetValue((__bridge CFStringRef)key,
+						(__bridge CFBooleanRef)@([value boolValue]),
+						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			}
 			else if ([type isEqualToString:@"-s"] || [type isEqualToString:@"-string"])
 			{
-				[defaults setObject:value forKey:key];
+				CFPreferencesSetValue((__bridge CFStringRef)key,
+						(__bridge CFStringRef)value,
+						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			}
+			else if ([type isEqualToString:@"-date"])
+			{
+				CFPreferencesSetValue((__bridge CFStringRef)key,
+						(__bridge CFDateRef)[[NSDateFormatter alloc] dateFromString:value],
+						appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			} else {
-				printf("Unrecognized type `%s`. For help, use `%s --help`.\n", [type UTF8String], argv[0]);
+				printf("Unrecognized type `%s`. For help, use `defaults help`.\n", [type UTF8String]);
 				return 3;
 			}
 
-			return [defaults synchronize] ? 0 : 1;
+			return CFPreferencesSynchronize(appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
 		}
 	}
 }

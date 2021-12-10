@@ -7,5 +7,7 @@
 	<true/>
 	<key>com.apple.private.skip-library-validation</key>
 	<true/>
+	<key>com.apple.private.trust-defaults-kvstore-identifier</key>
+	<true/>
 </dict>
 </plist>
