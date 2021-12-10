@@ -47,8 +47,8 @@ void usage()
 	printf("\n");
 	// TODO: printf("  rename <domain> <old_key> <new_key>  renames old_key to new_key\n");
 	printf("\n");
-	// TODO: printf("  delete <domain>                      deletes domain\n");
-	// TODO: printf("  delete <domain> <key>                deletes key in domain\n");
+	printf("  delete <domain>                      deletes domain\n");
+	printf("  delete <domain> <key>                deletes key in domain\n");
 	printf("\n");
 	// TODO: printf("  import <domain> <path to plist>      writes the plist at path to domain\n");
 	// TODO: printf("  import <domain> -                    writes a plist from stdin to domain\n");
@@ -112,13 +112,8 @@ int main(int argc, char *argv[], char *envp[])
 			else if ([args[2] isEqualToString:@"-app"]) {
 				appid = @"com.apple.Preferences";
 				[args removeObjectAtIndex:2];
-			} else {
-				if ([(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost) indexOfObject:args[2]] == NSNotFound) {
-					fprintf(stderr, "Domain %s does not exist\n", args[2].UTF8String);
-					return 1;
-				}
+			} else
 				appid = args[2];
-			}
 		}
 
 		/*
@@ -131,6 +126,10 @@ int main(int argc, char *argv[], char *envp[])
 					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 
 			if (args.count == 3) {
+				if ([result count] == 0) {
+					fprintf(stderr, "Domain %s does not exist\n", appid.UTF8String);
+					return 1;
+				}
 				printf("%s\n", result.description.UTF8String);
 				return 0;
 			} else {
@@ -175,6 +174,35 @@ int main(int argc, char *argv[], char *envp[])
 			}
 			CFRelease(result);
 			return 0;
+		}
+
+		if ((args.count == 4 || args.count == 3) && ([args[1] isEqualToString:@"delete"] ||
+				/* remove is an undocumented alias for delete */ [args[1] isEqualToString:@"remove"])) {
+			if (args.count == 4) {
+				CFPropertyListRef result = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+				if (result == NULL) {
+					fprintf(stderr, "Domain (%s) not found.\nDefaults have not been changed.\n", appid.UTF8String);
+					CFRelease(result);
+					return 1;
+				}
+				CFPreferencesSetValue((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+				return CFPreferencesSynchronize((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
+			} else if (args.count == 3) {
+				CFArrayRef keys = CFPreferencesCopyKeyList((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+				if (keys == NULL) {
+					fprintf(stderr, "Domain (%s) not found.\nDefaults have not been changed.\n", appid.UTF8String);
+					return 1;
+				}
+				CFPreferencesSetMultiple(NULL, keys, (__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+				return CFPreferencesSynchronize((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
+			}
+			return 1;
 		}
 
 		if ([args[1] isEqualToString:@"write"] && args.count == 2) {
