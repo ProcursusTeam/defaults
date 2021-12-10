@@ -1,11 +1,6 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
 
-@interface NSUserDefaults (defaults)
-- (id)objectForKey:(NSString *)key inDomain:(NSString *)domain;
-- (void)setObject:(id)value forKey:(NSString *)key inDomain:(NSString *)domain;
-@end
-
 void usage()
 {
 	printf("Command line interface to a user's defaults.\n");
@@ -57,6 +52,11 @@ int main(int argc, char *argv[], char *envp[])
 {
 	@autoreleasepool {
 		NSMutableArray <NSString *> *arguments = [[[NSProcessInfo processInfo] arguments] mutableCopy];
+
+		if (arguments.count == 1 || (arguments.count >= 2 && [arguments[1] isEqualToString:@"help"])) {
+			usage();
+			return arguments.count == 1 ? 1 : 0;
+		}
 
 		if (arguments.count >= 2 && [arguments[1] isEqualToString:@"domains"]) {
 			NSMutableArray *domains = [(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost) mutableCopy];
