@@ -29,6 +29,8 @@ const unsigned char defaultsVersionString[] = "@(#)PROGRAM:defaults  PROJECT:def
 #import <Foundation/Foundation.h>
 #include <stdio.h>
 
+int defaultsWrite(NSArray*, NSString*);
+
 void usage()
 {
 	printf("Command line interface to a user's defaults.\n");
@@ -42,7 +44,7 @@ void usage()
 	printf("\n");
 	printf("  read-type <domain> <key>             shows the type for the given domain, key\n");
 	printf("\n");
-	// TODO: printf("  write <domain> <domain_rep>          writes domain (overwrites existing)\n");
+	printf("  write <domain> <domain_rep>          writes domain (overwrites existing)\n");
 	printf("  write <domain> <key> <value>         writes key for domain\n");
 	printf("\n");
 	printf("  rename <domain> <old_key> <new_key>  renames old_key to new_key\n");
@@ -64,7 +66,7 @@ void usage()
 	printf("<value> is one of:\n");
 	printf("  <value_rep>\n");
 	printf("  -string <string_value>\n");
-	// TODO: printf("  -data <hex_digits>\n");
+	printf("  -data <hex_digits>\n");
 	printf("  -int[eger] <integer_value>\n");
 	printf("  -float  <floating-point_value>\n");
 	printf("  -bool[ean] (true | false | yes | no)\n");
@@ -308,53 +310,13 @@ int main(int argc, char *argv[], char *envp[])
 			return 1;
 		}
 
-		if ([args[1] isEqualToString:@"write"] && args.count == 2) {
-			usage();
-			return 1;
-		}
-
-		if ([args[1] isEqualToString:@"write"] && (args.count == 5 || args.count == 6))
-		{
-			NSString *key = args[3];
-			NSString *type = args.count == 5 ? @"-string" : args[4];
-			NSString *value = args.count == 5 ? args[4] : args[5];
-
-			if ([type isEqualToString:@"-i"] ||
-					[type isEqualToString:@"-int"] ||
-					[type isEqualToString:@"-integer"]) {
-				CFPreferencesSetValue((__bridge CFStringRef)key,
-						(__bridge CFNumberRef)@([value integerValue]),
-						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-			}
-			else if ([type isEqualToString:@"-f"] || [type isEqualToString:@"-float"])
-			{
-				CFPreferencesSetValue((__bridge CFStringRef)key,
-						(__bridge CFNumberRef)@([value floatValue]),
-						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-			}
-			else if ([type isEqualToString:@"-b"] || [type isEqualToString:@"-bool"] || [type isEqualToString:@"-boolean"])
-			{
-				CFPreferencesSetValue((__bridge CFStringRef)key,
-						(__bridge CFBooleanRef)@([value boolValue]),
-						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-			}
-			else if ([type isEqualToString:@"-s"] || [type isEqualToString:@"-string"])
-			{
-				CFPreferencesSetValue((__bridge CFStringRef)key,
-						(__bridge CFStringRef)value,
-						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-			}
-			else if ([type isEqualToString:@"-date"])
-			{
-				CFPreferencesSetValue((__bridge CFStringRef)key,
-						(__bridge CFDateRef)[[NSDateFormatter alloc] dateFromString:value],
-						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+		if ([args[1] isEqualToString:@"write"]) {
+			if (args.count < 4) {
+				usage();
+				return 1;
 			} else {
-				printf("Unrecognized type `%s`. For help, use `defaults help`.\n", [type UTF8String]);
-				return 3;
+				return defaultsWrite(args, appid);
 			}
-
-			return CFPreferencesSynchronize((__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
 		}
 
 		usage();
