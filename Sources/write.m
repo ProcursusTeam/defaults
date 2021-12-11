@@ -63,16 +63,33 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident) {
 
 	if (args.count == 5) {
 		NSObject *rep;
-		@try {
-			rep = [args[4] propertyList];
-		}
-		@catch (NSException *e) {
-			fprintf(stderr, "Could not parse: %s.  Try single-quoting it.\n", args[4].UTF8String);
+		// Should probably clean this up
+		if ([args[4] isEqualToString:@"-string"] || [args[4] isEqualToString:@"-data"] ||
+				[args[4] isEqualToString:@"-int"] || [args[4] isEqualToString:@"-integer"] ||
+				[args[4] isEqualToString:@"-float"] || [args[4] isEqualToString:@"-bool"] ||
+				[args[4] isEqualToString:@"-boolean"] || [args[4] isEqualToString:@"-date"]) {
+			usage();
 			return 1;
+		} else if ([args[4] isEqualToString:@"-array"]) {
+			rep = [[NSArray alloc] init];
+		} else if ([args[4] isEqualToString:@"-dict"]) {
+			rep = [[NSDictionary alloc] init];
+		} else if ([args[4] isEqualToString:@"-array-add"] || [args[4] isEqualToString:@"-dict-add"]) {
+			rep = nil;
+		} else {
+			@try {
+				rep = [args[4] propertyList];
+			}
+			@catch (NSException *e) {
+				fprintf(stderr, "Could not parse: %s.  Try single-quoting it.\n", args[4].UTF8String);
+				return 1;
+			}
 		}
-		CFPreferencesSetValue((__bridge CFStringRef)args[3], (__bridge CFPropertyListRef)rep,
-			(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-		CFPreferencesSynchronize((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+		if (rep != nil) {
+			CFPreferencesSetValue((__bridge CFStringRef)args[3], (__bridge CFPropertyListRef)rep,
+				(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			CFPreferencesSynchronize((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+		}
 		return 0;
 	} else if (args.count >= 6) {
 		CFPropertyListRef value = NULL;
