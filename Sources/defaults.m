@@ -50,8 +50,8 @@ void usage()
 	printf("  delete <domain>                      deletes domain\n");
 	printf("  delete <domain> <key>                deletes key in domain\n");
 	printf("\n");
-	// TODO: printf("  import <domain> <path to plist>      writes the plist at path to domain\n");
-	// TODO: printf("  import <domain> -                    writes a plist from stdin to domain\n");
+	printf("  import <domain> <path to plist>      writes the plist at path to domain\n");
+	printf("  import <domain> -                    writes a plist from stdin to domain\n");
 	printf("  export <domain> <path to plist>      saves domain as a binary plist to path\n");
 	printf("  export <domain> -                    writes domain as an xml plist to stdout\n");
 	printf("  domains                              lists all domains\n");
@@ -214,6 +214,45 @@ int main(int argc, char *argv[], char *envp[])
 				[fh writeData:outData];
 			} else
 				[outData writeToFile:args[3] atomically:true];
+			return 0;
+		}
+
+		if ([args[1] isEqualToString:@"import"]) {
+			if (args.count == 3) {
+				fprintf(stderr, "Need a path to read from\n");
+				return 1;
+			}
+
+			NSData *inputData;
+			if ([args[3] isEqualToString:@"-"]) {
+				NSFileHandle *fh = [NSFileHandle fileHandleWithStandardInput];
+				inputData = [fh readDataToEndOfFile];
+			} else {
+				inputData = [NSData dataWithContentsOfFile:args[3]];
+			}
+			if (inputData == nil) {
+				fprintf(stderr, "Could not read data from %s\n", args[3].UTF8String);
+			}
+
+			NSError *error;
+			NSObject *inputDict = [NSPropertyListSerialization propertyListWithData:inputData
+																																					options:0
+																																					 format:0
+																																						error:&error];
+			if (error) {
+				fprintf(stderr, "Could not parse property list from %s due to %s\n",
+						args[3].UTF8String, error.localizedDescription.UTF8String);
+				return 1;
+			}
+
+			if (![inputDict isKindOfClass:[NSDictionary class]]) {
+				fprintf(stderr, "Property list %s was not a dictionary\nDefaults have not been changed.\n",
+						args[3].UTF8String);
+				return 1;
+			}
+			CFPreferencesSetMultiple((__bridge CFDictionaryRef)(NSDictionary*)inputDict, NULL,
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			CFPreferencesSynchronize((__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
 			return 0;
 		}
 
