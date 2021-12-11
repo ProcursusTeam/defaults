@@ -45,7 +45,7 @@ void usage()
 	// TODO: printf("  write <domain> <domain_rep>          writes domain (overwrites existing)\n");
 	printf("  write <domain> <key> <value>         writes key for domain\n");
 	printf("\n");
-	// TODO: printf("  rename <domain> <old_key> <new_key>  renames old_key to new_key\n");
+	printf("  rename <domain> <old_key> <new_key>  renames old_key to new_key\n");
 	printf("\n");
 	printf("  delete <domain>                      deletes domain\n");
 	printf("  delete <domain> <key>                deletes key in domain\n");
@@ -110,6 +110,7 @@ int main(int argc, char *argv[], char *envp[])
 			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"])
 				appid = (__bridge NSString*)kCFPreferencesAnyApplication;
 			else if ([args[2] isEqualToString:@"-app"]) {
+				// TODO
 				appid = @"com.apple.Preferences";
 				[args removeObjectAtIndex:2];
 			} else
@@ -141,6 +142,28 @@ int main(int argc, char *argv[], char *envp[])
 				printf("%s\n", [[result objectForKey:args[3]] description].UTF8String);
 				return 0;
 			}
+		}
+
+		if (args.count == 5 && [args[1] isEqualToString:@"rename"]) {
+			CFPropertyListRef value = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			if (value == NULL) {
+				fprintf(stderr, "Key %s does not exist in domain %s; leaving defaults unchanged\n",
+						args[3].UTF8String,
+						[appid isEqualToString:(__bridge NSString*)kCFPreferencesAnyApplication]
+							? "Apple Global Domain" : appid.UTF8String);
+				return 1;
+			}
+			CFPreferencesSetValue((__bridge CFStringRef)args[4], value, (__bridge CFStringRef)appid,
+					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			CFPreferencesSetValue((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
+					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+			if (!CFPreferencesSynchronize((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, kCFPreferencesAnyHost)) {
+				fprintf(stderr, "Failed to write domain %s\n", appid.UTF8String);
+				return 1;
+			}
+			return 0;
 		}
 
 		if (args.count >= 4 && [args[1] isEqualToString:@"read-type"]) {
