@@ -147,11 +147,6 @@ int main(int argc, char *argv[], char *envp[])
 				appid = args[2];
 		}
 
-		/*
-		 * TODO: Fix printing of NSData/CFData
-		 * Currently they are truncated as {length = 410, bytes = 0x62706c69 ... 0000013a }
-		 * instead of only printing the hex.
-		 */
 		if ([args[1] isEqualToString:@"read"]) {
 			NSDictionary *result = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(NULL,
 					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);

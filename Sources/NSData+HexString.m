@@ -28,4 +28,9 @@
 	return [NSData dataWithBytesNoCopy:bytes length:[hex length]/2 freeWhenDone:YES];
 }
 
+/* Override the new NSData description to get only hex byes */
+- (NSString*)description {
+	return [self debugDescription];
+}
+
 @end
