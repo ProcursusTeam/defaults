@@ -1,3 +1,28 @@
+/*
+ * SPDX-License-Identifier: MIT
+ *
+ * Copyright (c) 2020-present quiprr
+ * Modified work Copyright (c) 2021 ProcursusTeam
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
 
@@ -22,7 +47,7 @@
  *   -dict-add <key1> <value1> ...
  */
 
-int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) {
+int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, CFStringRef container) {
 	if (args.count == 4) {
 		NSObject* rep = parsePropertyList(args[3]);
 
@@ -33,8 +58,9 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 
 		NSMutableArray *toRemove;
 
-		NSArray *keys = (__bridge_transfer NSArray*)CFPreferencesCopyKeyList((__bridge CFStringRef)ident,
-				kCFPreferencesCurrentUser, host);
+		NSArray *keys = (__bridge_transfer NSArray*)_CFPreferencesCopyKeyListWithContainer(
+				(__bridge CFStringRef)ident,
+				kCFPreferencesCurrentUser, host, container);
 		if (keys.count == 0) {
 			toRemove = NULL;
 		} else {
@@ -42,9 +68,17 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 			[toRemove removeObjectsInArray:[(NSDictionary *)rep allKeys]];
 		}
 
-		CFPreferencesSetMultiple((__bridge CFDictionaryRef)(NSDictionary*)rep, (__bridge CFArrayRef)toRemove,
-				(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
-		CFPreferencesSynchronize((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
+		for (NSString *key in [(NSDictionary *)rep allKeys]) {
+			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)key,
+					(__bridge CFPropertyListRef)[(NSDictionary*)rep objectForKey:key],
+					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
+		}
+		for (NSString *key in toRemove) {
+			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)key, NULL,
+					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
+		}
+		_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident, kCFPreferencesCurrentUser,
+				host, container);
 		return 0;
 	}
 
@@ -72,9 +106,10 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 			}
 		}
 		if (rep != nil) {
-			CFPreferencesSetValue((__bridge CFStringRef)args[3], (__bridge CFPropertyListRef)rep,
-				(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
-			CFPreferencesSynchronize((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
+			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], (__bridge CFPropertyListRef)rep,
+				(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
+			_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident, kCFPreferencesCurrentUser,
+					host, container);
 		}
 		return 0;
 	} else if (args.count >= 6) {
@@ -83,8 +118,8 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 		NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
 		if ([args[4] isEqualToString: @"-array"] || [args[4] isEqualToString: @"-array-add"]) { // Array
 			if ([args[4] isEqualToString: @"-array-add"]) {
-				CFPropertyListRef prepend = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
+				CFPropertyListRef prepend = _CFPreferencesCopyValueWithContainer((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
 				if (prepend != NULL) {
 					if (CFGetTypeID(prepend) != CFArrayGetTypeID()) {
 						fprintf(stderr, "Value for key %s is not an array; cannot append.  Leaving defaults unchanged.\n",
@@ -113,8 +148,8 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 			value = (__bridge CFPropertyListRef)array;
 		} else if ([args[4] isEqualToString: @"-dict"] || [args[4] isEqualToString: @"-dict-add"]) { // Array
 			if ([args[4] isEqualToString: @"-dict-add"]) {
-				CFPropertyListRef prepend = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
+				CFPropertyListRef prepend = _CFPreferencesCopyValueWithContainer((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
 				if (prepend != NULL) {
 					if (CFGetTypeID(prepend) != CFDictionaryGetTypeID()) {
 						fprintf(stderr, "Value for key %s is not a dictionary; cannot append.  Leaving defaults unchanged.\n",
@@ -168,9 +203,9 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 			fprintf(stderr, "Unexpected argument %s; leaving defaults unchanged.\n", args[5].UTF8String);
 			return 1;
 		}
-		CFPreferencesSetValue((__bridge CFStringRef)args[3], value,
-			(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
-		CFPreferencesSynchronize((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host);
+		_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], value,
+			(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
+		_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
 		return 0;
 	}
 

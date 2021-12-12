@@ -62,6 +62,9 @@ void usage()
 	printf("\n");
 	printf("<domain> is ( <domain_name> | -app <application_name> | -globalDomain )\n");
 	printf("         or a path to a file omitting the '.plist' extension\n");
+	printf("\n         [-container (<bundleid> | <groupid> | <path>)]\n");
+	printf("         may be specified before the domain name to change the container\n");
+	printf("         this is a Procursus extension\n");
 	printf("\n");
 	printf("<value> is one of:\n");
 	printf("  <value_rep>\n");
@@ -94,7 +97,24 @@ int main(int argc, char *argv[], char *envp[])
 			[args removeObjectAtIndex:1];
 		} else if ([args[1] isEqualToString:@"-host"]) {
 			host = (__bridge CFStringRef)args[2];
+			[args removeObjectAtIndex:2];
 			[args removeObjectAtIndex:1];
+		}
+
+		CFStringRef container = CFSTR("kCFPreferencesNoContainer");
+
+		if (args.count >= 4 && [args[2] isEqualToString:@"-container"]) {
+			if ([args[3] hasPrefix:@"/"]) {
+				container = (__bridge CFStringRef)[args[3] stringByResolvingSymlinksInPath];
+			} else if ([args[3] hasPrefix:@"group."]) {
+				NSURL *url = [[NSFileManager defaultManager]
+					containerURLForSecurityApplicationGroupIdentifier:args[3]];
+				container = (__bridge CFStringRef)[(NSURL*)[url copy] path];
+			} else {
+				LSApplicationProxy *app = [LSApplicationProxy applicationProxyForIdentifier:args[3]];
+				container = (__bridge CFStringRef)[app.containerURL path];
+			}
+			[args removeObjectAtIndex:3];
 			[args removeObjectAtIndex:2];
 		}
 
@@ -132,7 +152,7 @@ int main(int argc, char *argv[], char *envp[])
 			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"] ||
 					[args[2] isEqualToString:@"NSGlobalDomain"])
 				appid = (__bridge NSString*)kCFPreferencesAnyApplication;
-			else if ([args[2] isEqualToString:@"-app"]) {
+			else if (args.count >= 4 && [args[2] isEqualToString:@"-app"]) {
 				LSApplicationWorkspace *workspace = [LSApplicationWorkspace defaultWorkspace];
 				NSArray<LSApplicationProxy*> *apps = [workspace allInstalledApplications];
 				for (LSApplicationProxy *proxy in apps) {
@@ -153,8 +173,8 @@ int main(int argc, char *argv[], char *envp[])
 		}
 
 		if ([args[1] isEqualToString:@"read"]) {
-			NSDictionary *result = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(NULL,
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
+			NSDictionary *result = (__bridge_transfer NSDictionary *)_CFPreferencesCopyMultipleWithContainer(NULL,
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host, container);
 
 			if (args.count == 3) {
 				if ([result count] == 0) {
@@ -175,8 +195,8 @@ int main(int argc, char *argv[], char *envp[])
 		}
 
 		if (args.count == 5 && [args[1] isEqualToString:@"rename"]) {
-			CFPropertyListRef value = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
+			CFPropertyListRef value = _CFPreferencesCopyValueWithContainer((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host, container);
 			if (value == NULL) {
 				fprintf(stderr, "Key %s does not exist in domain %s; leaving defaults unchanged\n",
 						args[3].UTF8String,
@@ -184,12 +204,12 @@ int main(int argc, char *argv[], char *envp[])
 							? "Apple Global Domain" : appid.UTF8String);
 				return 1;
 			}
-			CFPreferencesSetValue((__bridge CFStringRef)args[4], value, (__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, host);
-			CFPreferencesSetValue((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, host);
-			if (!CFPreferencesSynchronize((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, host)) {
+			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[4], value, (__bridge CFStringRef)appid,
+					kCFPreferencesCurrentUser, host, container);
+			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
+					kCFPreferencesCurrentUser, host, container);
+			if (!_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, host, container)) {
 				fprintf(stderr, "Failed to write domain %s\n", appid.UTF8String);
 				return 1;
 			}
@@ -197,8 +217,8 @@ int main(int argc, char *argv[], char *envp[])
 		}
 
 		if (args.count >= 4 && [args[1] isEqualToString:@"read-type"]) {
-			CFPropertyListRef result = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
+			CFPropertyListRef result = _CFPreferencesCopyValueWithContainer((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host, container);
 			if (result == NULL) {
 				fprintf(stderr, "The domain/default pair of (%s, %s) does not exist\n",
 						appid.UTF8String, args[3].UTF8String);
@@ -234,11 +254,11 @@ int main(int argc, char *argv[], char *envp[])
 				fprintf(stderr, "Need a path to write to\n");
 				return 1;
 			}
-			NSArray *keys = (__bridge_transfer NSArray*)CFPreferencesCopyKeyList((__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, host);
-			NSDictionary *out = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(
+			NSArray *keys = (__bridge_transfer NSArray*)_CFPreferencesCopyKeyListWithContainer((__bridge CFStringRef)appid,
+					kCFPreferencesCurrentUser, host, container);
+			NSDictionary *out = (__bridge_transfer NSDictionary *)_CFPreferencesCopyMultipleWithContainer(
 					(__bridge CFArrayRef)keys, (__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, host);
+					kCFPreferencesCurrentUser, host, container);
 			if (out == 0) {
 				fprintf(stderr, "The domain %s does not exist\n", appid.UTF8String);
 				return 1;
@@ -303,37 +323,43 @@ int main(int argc, char *argv[], char *envp[])
 						args[3].UTF8String);
 				return 1;
 			}
-			CFPreferencesSetMultiple((__bridge CFDictionaryRef)(NSDictionary*)inputDict, NULL,
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
-			CFPreferencesSynchronize((__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
+			for (NSString *key in [(NSDictionary*)inputData allKeys]) {
+				_CFPreferencesSetValueWithContainer((__bridge CFStringRef)key,
+						(__bridge CFPropertyListRef)[(NSDictionary*)inputData objectForKey:key],
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host, container);
+			}
+			_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)appid, kCFPreferencesCurrentUser,
+					host, container);
 			return 0;
 		}
 
 		if ((args.count == 4 || args.count == 3) && ([args[1] isEqualToString:@"delete"] ||
 				/* remove is an undocumented alias for delete */ [args[1] isEqualToString:@"remove"])) {
 			if (args.count == 4) {
-				CFPropertyListRef result = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
+				CFPropertyListRef result = _CFPreferencesCopyValueWithContainer((__bridge CFStringRef)args[3],
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host, container);
 				if (result == NULL) {
 					fprintf(stderr, "Domain (%s) not found.\nDefaults have not been changed.\n", appid.UTF8String);
 					CFRelease(result);
 					return 1;
 				}
-				CFPreferencesSetValue((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, host);
-				return CFPreferencesSynchronize((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, host) ? 0 : 1;
+				_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, host, container);
+				return _CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, host, container) ? 0 : 1;
 			} else if (args.count == 3) {
-				CFArrayRef keys = CFPreferencesCopyKeyList((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, host);
+				CFArrayRef keys = _CFPreferencesCopyKeyListWithContainer((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, host, container);
 				if (keys == NULL) {
 					fprintf(stderr, "Domain (%s) not found.\nDefaults have not been changed.\n", appid.UTF8String);
 					return 1;
 				}
-				CFPreferencesSetMultiple(NULL, keys, (__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, host);
-				return CFPreferencesSynchronize((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, host) ? 0 : 1;
+				for (NSString *key in (__bridge NSArray*)keys) {
+					_CFPreferencesSetValueWithContainer((__bridge CFStringRef)key, NULL,
+							(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host, container);
+				}
+				return _CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)appid,
+						kCFPreferencesCurrentUser, host, container) ? 0 : 1;
 			}
 			return 1;
 		}
@@ -343,7 +369,7 @@ int main(int argc, char *argv[], char *envp[])
 				usage();
 				return 255;
 			} else {
-				return defaultsWrite(args, appid, host);
+				return defaultsWrite(args, appid, host, container);
 			}
 		}
 

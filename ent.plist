@@ -9,5 +9,7 @@
 	<true/>
 	<key>com.apple.private.trust-defaults-kvstore-identifier</key>
 	<true/>
+	<key>com.apple.private.MobileContainerManager.allowed</key>
+	<true/>
 </dict>
 </plist>
