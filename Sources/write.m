@@ -55,7 +55,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 		// Should probably clean this up
 		if (isType(args[4])) {
 			usage();
-			return 1;
+			return 255;
 		} else if ([args[4] isEqualToString:@"-array"]) {
 			rep = [[NSArray alloc] init];
 		} else if ([args[4] isEqualToString:@"-dict"]) {
@@ -103,7 +103,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 				if (isType(arrayItems[i])) {
 					if (i >= arrayItems.count - 1) {
 						usage();
-						return 1;
+						return 255;
 					}
 					[array addObject: (__bridge NSObject*)parseTypedArg(arrayItems[i], arrayItems[++i], true)];
 				} else {
@@ -134,9 +134,10 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 					if ([arrayItems[i] isEqualToString:@"-string"]) {
 						i++;
 					} else {
-						if (arrayItems.count == 1)
+						if (arrayItems.count == 1) {
 							usage();
-						else
+							return 255;
+						} else
 							fprintf(stderr, "Dictionary keys must be strings\n");
 						return 1;
 					}
@@ -148,7 +149,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host) 
 				if (isType(arrayItems[i + 1])) {
 					if (i >= arrayItems.count - 2) {
 						usage();
-						return 1;
+						return 255;
 					}
 					[dict setObject:(__bridge_transfer NSObject*)parseTypedArg(arrayItems[i + 1], arrayItems[i + 2], true)
 						forKey:arrayItems[i]];

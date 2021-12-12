@@ -83,6 +83,11 @@ int main(int argc, char *argv[], char *envp[])
 	@autoreleasepool {
 		NSMutableArray <NSString *> *args = [[[NSProcessInfo processInfo] arguments] mutableCopy];
 
+		if (args.count == 1) {
+			usage();
+			return 255;
+		}
+
 		CFStringRef host = kCFPreferencesAnyHost;
 		if ([args[1] isEqualToString:@"-currentHost"]) {
 			host = kCFPreferencesCurrentHost;
@@ -95,7 +100,7 @@ int main(int argc, char *argv[], char *envp[])
 
 		if (args.count == 1 || (args.count >= 2 && [args[1] isEqualToString:@"help"])) {
 			usage();
-			return args.count == 1 ? 1 : 0;
+			return args.count == 1 ? 255 : 0;
 		}
 
 		if ([args[1] isEqualToString:@"domains"]) {
@@ -137,7 +142,7 @@ int main(int argc, char *argv[], char *envp[])
 					}
 				}
 				if (appid == nil) {
-					fprintf(stderr, "Couldn't find an application named \"%s\"; defaults unchanged\n", args[2].UTF8String);
+					fprintf(stderr, "Couldn't find an application named \"%s\"; defaults unchanged\n", args[3].UTF8String);
 					return 1;
 				}
 				[args removeObjectAtIndex:2];
@@ -336,13 +341,13 @@ int main(int argc, char *argv[], char *envp[])
 		if ([args[1] isEqualToString:@"write"]) {
 			if (args.count < 4) {
 				usage();
-				return 1;
+				return 255;
 			} else {
 				return defaultsWrite(args, appid, host);
 			}
 		}
 
 		usage();
-		return 1;
+		return 255;
 	}
 }
