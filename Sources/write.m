@@ -1,15 +1,11 @@
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
+
 #import "NSData+HexString.h"
+#include "defaults.h"
 
-@interface NSDate (deprecated)
-+ (id)dateWithNaturalLanguageString:(NSString *)string;
-+ (id)dateWithString:(NSString *)aString;
-@end
-
-void usage();
-
-/* write <domain> <domain_rep>   writes domain (overwrites existing)
+/*
+ * write <domain> <domain_rep>   writes domain (overwrites existing)
  * write <domain> <key> <value>  writes key for domain
  *
  * <value> is one of:
@@ -28,14 +24,7 @@ void usage();
 
 int defaultsWrite(NSArray<NSString *> *args, NSString *ident) {
 	if (args.count == 4) {
-		NSObject *rep;
-		@try {
-			rep = [args[3] propertyList];
-		}
-		@catch (NSException *e) {
-			fprintf(stderr, "Could not parse: %s.  Try single-quoting it.\n", args[3].UTF8String);
-			return 1;
-		}
+		NSObject* rep = parsePropertyList(args[3]);
 
 		if (![rep isKindOfClass:[NSDictionary class]]) {
 			fprintf(stderr, "Rep argument is not a dictionary\nDefaults have not been changed.\n");
@@ -64,10 +53,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident) {
 	if (args.count == 5) {
 		NSObject *rep;
 		// Should probably clean this up
-		if ([args[4] isEqualToString:@"-string"] || [args[4] isEqualToString:@"-data"] ||
-				[args[4] isEqualToString:@"-int"] || [args[4] isEqualToString:@"-integer"] ||
-				[args[4] isEqualToString:@"-float"] || [args[4] isEqualToString:@"-bool"] ||
-				[args[4] isEqualToString:@"-boolean"] || [args[4] isEqualToString:@"-date"]) {
+		if (isType(args[4])) {
 			usage();
 			return 1;
 		} else if ([args[4] isEqualToString:@"-array"]) {
@@ -93,49 +79,93 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident) {
 		return 0;
 	} else if (args.count >= 6) {
 		CFPropertyListRef value = NULL;
-		for (int i = 4; i < args.count; i++) {
-			if (value != NULL) {
-				fprintf(stderr, "Unexpected argument %s; leaving defaults unchanged.\n", args[i].UTF8String);
-				return 1;
-			} else if ([args[i] isEqualToString:@"-string"]) {
-				value = (__bridge CFStringRef)args[++i];
-			} else if ([args[i] isEqualToString:@"-int"] || [args[i] isEqualToString:@"-integer"]) {
-				value = (__bridge CFNumberRef)@([args[++i] longLongValue]);
-			} else if ([args[i] isEqualToString:@"-float"]) {
-				value = (__bridge CFNumberRef)@([args[++i] floatValue]);
-			} else if ([args[i] isEqualToString:@"-bool"] || [args[i] isEqualToString:@"-boolean"]) {
-				i++;
-				if ([args[i] caseInsensitiveCompare:@"yes"] == NSOrderedSame)
-					value = kCFBooleanTrue;
-				else if ([args[i] caseInsensitiveCompare:@"true"] == NSOrderedSame)
-					value = kCFBooleanTrue;
-				else if ([args[i] caseInsensitiveCompare:@"no"] == NSOrderedSame)
-					value = kCFBooleanFalse;
-				else if ([args[i] caseInsensitiveCompare:@"false"] == NSOrderedSame)
-					value = kCFBooleanFalse;
-				else {
-					usage();
-					return 1;
-				}
-			} else if ([args[i] isEqualToString:@"-date"]) {
-				value = (__bridge CFDateRef)[NSDate dateWithString:args[++i]];
-				if (value == NULL)
-					value = (__bridge CFDateRef)[NSDate dateWithNaturalLanguageString:args[i]];
-				if (value == NULL) {
-					usage();
-					return 1;
-				}
-			} else if ([args[i] isEqualToString:@"-data"]) {
-				value = (__bridge CFDataRef)[NSData dataWithHexString:args[++i]];
-			} else {
-				@try {
-					value = (__bridge CFPropertyListRef)[args[++i] propertyList];
-				}
-				@catch (NSException *e) {
-					fprintf(stderr, "Could not parse: %s.  Try single-quoting it.\n", args[i].UTF8String);
-					return 1;
+		NSMutableArray<NSObject *> *array = [[NSMutableArray alloc] init];
+		NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
+		if ([args[4] isEqualToString: @"-array"] || [args[4] isEqualToString: @"-array-add"]) { // Array
+			if ([args[4] isEqualToString: @"-array-add"]) {
+				CFPropertyListRef prepend = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+				if (prepend != NULL) {
+					if (CFGetTypeID(prepend) != CFArrayGetTypeID()) {
+						fprintf(stderr, "Value for key %s is not an array; cannot append.  Leaving defaults unchanged.\n",
+							args[3].UTF8String);
+						return 1;
+					}
+					[array addObjectsFromArray:(__bridge_transfer NSArray*)prepend];
 				}
 			}
+			NSArray<NSString*> *arrayItems = [args subarrayWithRange:NSMakeRange(5, args.count - 5)];
+			for (int i = 0; i < arrayItems.count; i++) {
+				if ([arrayItems[i] isEqualToString:@"-array"] || [arrayItems[i] isEqualToString:@"-dict"]) {
+					fprintf(stderr, "Cannot nest composite types (arrays and dictionaries); exiting\n");
+					return 1;
+				}
+				if (isType(arrayItems[i])) {
+					if (i >= arrayItems.count - 1) {
+						usage();
+						return 1;
+					}
+					[array addObject: (__bridge NSObject*)parseTypedArg(arrayItems[i], arrayItems[++i], true)];
+				} else {
+					[array addObject: (__bridge NSObject*)parseTypedArg(NULL, arrayItems[i], true)];
+				}
+			}
+			value = (__bridge CFPropertyListRef)array;
+		} else if ([args[4] isEqualToString: @"-dict"] || [args[4] isEqualToString: @"-dict-add"]) { // Array
+			if ([args[4] isEqualToString: @"-dict-add"]) {
+				CFPropertyListRef prepend = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
+					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+				if (prepend != NULL) {
+					if (CFGetTypeID(prepend) != CFDictionaryGetTypeID()) {
+						fprintf(stderr, "Value for key %s is not a dictionary; cannot append.  Leaving defaults unchanged.\n",
+							args[3].UTF8String);
+						return 1;
+					}
+					[dict addEntriesFromDictionary:(__bridge_transfer NSDictionary*)prepend];
+				}
+			}
+			NSArray<NSString*> *arrayItems = [args subarrayWithRange:NSMakeRange(5, args.count - 5)];
+			for (int i = 0; i < arrayItems.count; i++) {
+				if ([arrayItems[i] isEqualToString:@"-array"] || [arrayItems[i] isEqualToString:@"-dict"]) {
+					fprintf(stderr, "Cannot nest composite types (arrays and dictionaries); exiting\n");
+					return 1;
+				}
+				if (isType(arrayItems[i])) {
+					if ([arrayItems[i] isEqualToString:@"-string"]) {
+						i++;
+					} else {
+						if (arrayItems.count == 1)
+							usage();
+						else
+							fprintf(stderr, "Dictionary keys must be strings\n");
+						return 1;
+					}
+				}
+				if (i == arrayItems.count - 1) {
+					fprintf(stderr, "Key %s lacks a corresponding value\n", arrayItems[i].UTF8String);
+					return 1;
+				}
+				if (isType(arrayItems[i + 1])) {
+					if (i >= arrayItems.count - 2) {
+						usage();
+						return 1;
+					}
+					[dict setObject:(__bridge_transfer NSObject*)parseTypedArg(arrayItems[i + 1], arrayItems[i + 2], true)
+						forKey:arrayItems[i]];
+					i += 2;
+				} else {
+					[dict setObject:(__bridge_transfer NSObject*)parseTypedArg(NULL, arrayItems[i + 1], true)
+						forKey:arrayItems[i]];
+					i++;
+				}
+			}
+			value = (__bridge CFPropertyListRef)dict;
+		}
+		if (value == NULL)
+			value = parseTypedArg(args[4], args[5], false);
+		else if (args.count > 6 && array.count == 0 && dict.count == 0) {
+			fprintf(stderr, "Unexpected argument %s; leaving defaults unchanged.\n", args[5].UTF8String);
+			return 1;
 		}
 		CFPreferencesSetValue((__bridge CFStringRef)args[3], value,
 			(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);

@@ -3,6 +3,7 @@ CFLAGS  ?= -O2
 LDFLAGS ?= -O2
 
 SRC := Sources/defaults.m Sources/write.m
+SRC += Sources/helpers.m
 SRC += Sources/NSData+HexString.m
 
 all: defaults

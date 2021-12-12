@@ -29,7 +29,7 @@ const unsigned char defaultsVersionString[] = "@(#)PROGRAM:defaults  PROJECT:def
 #import <Foundation/Foundation.h>
 #include <stdio.h>
 
-int defaultsWrite(NSArray*, NSString*);
+#include "defaults.h"
 
 void usage()
 {
@@ -71,10 +71,10 @@ void usage()
 	printf("  -float  <floating-point_value>\n");
 	printf("  -bool[ean] (true | false | yes | no)\n");
 	printf("  -date <date_rep>\n");
-	// TODO: printf("  -array <value1> <value2> ...\n");
-	// TODO: printf("  -array-add <value1> <value2> ...\n");
-	// TODO: printf("  -dict <key1> <value1> <key2> <value2> ...\n");
-	// TODO: printf("  -dict-add <key1> <value1> ...\n");
+	printf("  -array <value1> <value2> ...\n");
+	printf("  -array-add <value1> <value2> ...\n");
+	printf("  -dict <key1> <value1> <key2> <value2> ...\n");
+	printf("  -dict-add <key1> <value1> ...\n");
 	printf("\nContact the Procursus Team for support.\n");
 }
 
