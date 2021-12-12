@@ -38,6 +38,11 @@ CFPropertyListRef parseTypedArg(NSString *type, NSString *value, bool inArray) {
 		}
 		return date;
 	} else if ([type isEqualToString:@"-data"]) {
+		NSCharacterSet *set = [[NSCharacterSet characterSetWithCharactersInString:@"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"] invertedSet];
+		if ([value length] % 2 != 0 || [value rangeOfCharacterFromSet:set].location != NSNotFound) {
+			usage();
+			exit(255);
+		}
 		return (__bridge CFDataRef)[NSData dataWithHexString:value];
 	}
 	return NULL;
