@@ -36,7 +36,7 @@ void usage()
 	printf("Command line interface to a user's defaults.\n");
 	printf("Syntax:\n");
 	printf("\n");
-	printf("'defaults' TODO: [-currentHost | -host <hostname>] followed by one of the following:\n");
+	printf("'defaults' [-currentHost | -host <hostname>] followed by one of the following:\n");
 	printf("\n");
 	printf("  read                                 shows all defaults\n");
 	printf("  read <domain>                        shows defaults for given domain\n");
@@ -83,23 +83,33 @@ int main(int argc, char *argv[], char *envp[])
 	@autoreleasepool {
 		NSMutableArray <NSString *> *args = [[[NSProcessInfo processInfo] arguments] mutableCopy];
 
+		CFStringRef host = kCFPreferencesAnyHost;
+		if ([args[1] isEqualToString:@"-currentHost"]) {
+			host = kCFPreferencesCurrentHost;
+			[args removeObjectAtIndex:1];
+		} else if ([args[1] isEqualToString:@"-host"]) {
+			host = (__bridge CFStringRef)args[2];
+			[args removeObjectAtIndex:1];
+			[args removeObjectAtIndex:2];
+		}
+
 		if (args.count == 1 || (args.count >= 2 && [args[1] isEqualToString:@"help"])) {
 			usage();
 			return args.count == 1 ? 1 : 0;
 		}
 
 		if ([args[1] isEqualToString:@"domains"]) {
-			NSMutableArray *domains = [(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost) mutableCopy];
+			NSMutableArray *domains = [(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, host) mutableCopy];
 			[domains removeObjectAtIndex:[domains indexOfObject:(id)kCFPreferencesAnyApplication]];
 			[domains sortUsingSelector:@selector(compare:)];
 			printf("%s\n", [domains componentsJoinedByString:@", "].UTF8String);
 			return 0;
 		} else if (args.count == 2 && [args[1] isEqualToString:@"read"]) {
 			NSArray *prefs = (__bridge_transfer NSArray *)
-				CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+				CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, host);
 			NSMutableDictionary *out = [NSMutableDictionary new];
 			for (NSString *domain in prefs) {
-				[out setObject:(__bridge_transfer NSDictionary*)CFPreferencesCopyMultiple(NULL, (__bridge CFStringRef)domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+				[out setObject:(__bridge_transfer NSDictionary*)CFPreferencesCopyMultiple(NULL, (__bridge CFStringRef)domain, kCFPreferencesCurrentUser, host)
 								forKey:[domain isEqualToString:(__bridge NSString *)kCFPreferencesAnyApplication] ? @"Apple Global Domain" : domain];
 			}
 			printf("%s\n", [NSString stringWithFormat:@"%@", out].UTF8String);
@@ -136,7 +146,7 @@ int main(int argc, char *argv[], char *envp[])
 		 */
 		if ([args[1] isEqualToString:@"read"]) {
 			NSDictionary *result = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(NULL,
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
 
 			if (args.count == 3) {
 				if ([result count] == 0) {
@@ -158,7 +168,7 @@ int main(int argc, char *argv[], char *envp[])
 
 		if (args.count == 5 && [args[1] isEqualToString:@"rename"]) {
 			CFPropertyListRef value = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
 			if (value == NULL) {
 				fprintf(stderr, "Key %s does not exist in domain %s; leaving defaults unchanged\n",
 						args[3].UTF8String,
@@ -167,11 +177,11 @@ int main(int argc, char *argv[], char *envp[])
 				return 1;
 			}
 			CFPreferencesSetValue((__bridge CFStringRef)args[4], value, (__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					kCFPreferencesCurrentUser, host);
 			CFPreferencesSetValue((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					kCFPreferencesCurrentUser, host);
 			if (!CFPreferencesSynchronize((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, kCFPreferencesAnyHost)) {
+						kCFPreferencesCurrentUser, host)) {
 				fprintf(stderr, "Failed to write domain %s\n", appid.UTF8String);
 				return 1;
 			}
@@ -180,7 +190,7 @@ int main(int argc, char *argv[], char *envp[])
 
 		if (args.count >= 4 && [args[1] isEqualToString:@"read-type"]) {
 			CFPropertyListRef result = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
 			if (result == NULL) {
 				fprintf(stderr, "The domain/default pair of (%s, %s) does not exist\n",
 						appid.UTF8String, args[3].UTF8String);
@@ -217,10 +227,10 @@ int main(int argc, char *argv[], char *envp[])
 				return 1;
 			}
 			NSArray *keys = (__bridge_transfer NSArray*)CFPreferencesCopyKeyList((__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					kCFPreferencesCurrentUser, host);
 			NSDictionary *out = (__bridge_transfer NSDictionary *)CFPreferencesCopyMultiple(
 					(__bridge CFArrayRef)keys, (__bridge CFStringRef)appid,
-					kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					kCFPreferencesCurrentUser, host);
 			if (out == 0) {
 				fprintf(stderr, "The domain %s does not exist\n", appid.UTF8String);
 				return 1;
@@ -286,8 +296,8 @@ int main(int argc, char *argv[], char *envp[])
 				return 1;
 			}
 			CFPreferencesSetMultiple((__bridge CFDictionaryRef)(NSDictionary*)inputDict, NULL,
-					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
-			CFPreferencesSynchronize((__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
+			CFPreferencesSynchronize((__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
 			return 0;
 		}
 
@@ -295,27 +305,27 @@ int main(int argc, char *argv[], char *envp[])
 				/* remove is an undocumented alias for delete */ [args[1] isEqualToString:@"remove"])) {
 			if (args.count == 4) {
 				CFPropertyListRef result = CFPreferencesCopyValue((__bridge CFStringRef)args[3],
-						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host);
 				if (result == NULL) {
 					fprintf(stderr, "Domain (%s) not found.\nDefaults have not been changed.\n", appid.UTF8String);
 					CFRelease(result);
 					return 1;
 				}
 				CFPreferencesSetValue((__bridge CFStringRef)args[3], NULL, (__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						kCFPreferencesCurrentUser, host);
 				return CFPreferencesSynchronize((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
+						kCFPreferencesCurrentUser, host) ? 0 : 1;
 			} else if (args.count == 3) {
 				CFArrayRef keys = CFPreferencesCopyKeyList((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						kCFPreferencesCurrentUser, host);
 				if (keys == NULL) {
 					fprintf(stderr, "Domain (%s) not found.\nDefaults have not been changed.\n", appid.UTF8String);
 					return 1;
 				}
 				CFPreferencesSetMultiple(NULL, keys, (__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, kCFPreferencesAnyHost);
+						kCFPreferencesCurrentUser, host);
 				return CFPreferencesSynchronize((__bridge CFStringRef)appid,
-						kCFPreferencesCurrentUser, kCFPreferencesAnyHost) ? 0 : 1;
+						kCFPreferencesCurrentUser, host) ? 0 : 1;
 			}
 			return 1;
 		}
@@ -325,7 +335,7 @@ int main(int argc, char *argv[], char *envp[])
 				usage();
 				return 1;
 			} else {
-				return defaultsWrite(args, appid);
+				return defaultsWrite(args, appid, host);
 			}
 		}
 

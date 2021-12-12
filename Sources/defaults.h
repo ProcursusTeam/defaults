@@ -1,7 +1,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
 
-int defaultsWrite(NSArray*, NSString*);
+int defaultsWrite(NSArray*, NSString*, CFStringRef);
 void usage();
 CFPropertyListRef parseTypedArg(NSString*, NSString*, bool);
 NSObject* parsePropertyList(NSString*);
