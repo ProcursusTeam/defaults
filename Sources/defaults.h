@@ -15,3 +15,13 @@ bool isType(NSString*);
 + (id)dateWithNaturalLanguageString:(NSString *)string;
 + (id)dateWithString:(NSString *)aString;
 @end
+
+@interface LSApplicationProxy : NSObject
+@property(nonatomic, assign, readonly) NSString *applicationIdentifier;
+- (id)localizedNameForContext:(id)context;
+@end
+
+@interface LSApplicationWorkspace : NSObject
++ (id)defaultWorkspace;
+- (NSArray<LSApplicationProxy *> *)allInstalledApplications;
+@end

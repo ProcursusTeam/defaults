@@ -60,7 +60,7 @@ void usage()
 	// TODO: printf("  find <word>                          lists all entries containing word\n");
 	printf("  help                                 print this help\n");
 	printf("\n");
-	printf("<domain> is ( <domain_name> | TODO: -app <application_name> | -globalDomain )\n");
+	printf("<domain> is ( <domain_name> | -app <application_name> | -globalDomain )\n");
 	printf("         or a path to a file omitting the '.plist' extension\n");
 	printf("\n");
 	printf("<value> is one of:\n");
@@ -109,11 +109,21 @@ int main(int argc, char *argv[], char *envp[])
 		NSString *appid;
 
 		if (args.count >= 3 && ![args[1] isEqualToString:@"find"]) {
-			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"])
+			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"] || [args[2] isEqualToString:@"NSGlobalDomain"])
 				appid = (__bridge NSString*)kCFPreferencesAnyApplication;
 			else if ([args[2] isEqualToString:@"-app"]) {
-				// TODO
-				appid = @"com.apple.Preferences";
+				LSApplicationWorkspace *workspace = [LSApplicationWorkspace defaultWorkspace];
+				NSArray<LSApplicationProxy*> *apps = [workspace allInstalledApplications];
+				for (LSApplicationProxy *proxy in apps) {
+					if ([args[3] isEqualToString:[proxy localizedNameForContext:nil]]) {
+						appid = proxy.applicationIdentifier;
+						break;
+					}
+				}
+				if (appid == nil) {
+					fprintf(stderr, "Couldn't find an application named \"%s\"; defaults unchanged\n", args[2].UTF8String);
+					return 1;
+				}
 				[args removeObjectAtIndex:2];
 			} else
 				appid = args[2];
