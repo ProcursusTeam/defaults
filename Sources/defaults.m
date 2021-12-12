@@ -116,10 +116,16 @@ int main(int argc, char *argv[], char *envp[])
 			return 0;
 		}
 
+		if ([args[1] isEqualToString:@"find"]) {
+			// TODO: find code
+			return 1;
+		}
+
 		NSString *appid;
 
-		if (args.count >= 3 && ![args[1] isEqualToString:@"find"]) {
-			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"] || [args[2] isEqualToString:@"NSGlobalDomain"])
+		if (args.count >= 3) {
+			if ([args[2] isEqualToString:@"-g"] || [args[2] isEqualToString:@"-globalDomain"] ||
+					[args[2] isEqualToString:@"NSGlobalDomain"])
 				appid = (__bridge NSString*)kCFPreferencesAnyApplication;
 			else if ([args[2] isEqualToString:@"-app"]) {
 				LSApplicationWorkspace *workspace = [LSApplicationWorkspace defaultWorkspace];
@@ -135,6 +141,8 @@ int main(int argc, char *argv[], char *envp[])
 					return 1;
 				}
 				[args removeObjectAtIndex:2];
+			} else if ([args[2] hasPrefix:@"/"]) {
+				appid = [args[2] stringByResolvingSymlinksInPath];
 			} else
 				appid = args[2];
 		}
