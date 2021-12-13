@@ -31,74 +31,24 @@ const unsigned char defaultsVersionString[] = "@(#)PROGRAM:defaults  PROJECT:def
 
 #include "defaults.h"
 
-void usage()
-{
-	printf("Command line interface to a user's defaults.\n");
-	printf("Syntax:\n");
-	printf("\n");
-	printf("'defaults' [-currentHost | -host <hostname>] followed by one of the following:\n");
-	printf("\n");
-	printf("  read                                 shows all defaults\n");
-	printf("  read <domain>                        shows defaults for given domain\n");
-	printf("  read <domain> <key>                  shows defaults for given domain, key\n");
-	printf("\n");
-	printf("  read-type <domain> <key>             shows the type for the given domain, key\n");
-	printf("\n");
-	printf("  write <domain> <domain_rep>          writes domain (overwrites existing)\n");
-	printf("  write <domain> <key> <value>         writes key for domain\n");
-	printf("\n");
-	printf("  rename <domain> <old_key> <new_key>  renames old_key to new_key\n");
-	printf("\n");
-	printf("  delete <domain>                      deletes domain\n");
-	printf("  delete <domain> <key>                deletes key in domain\n");
-	printf("\n");
-	printf("  import <domain> <path to plist>      writes the plist at path to domain\n");
-	printf("  import <domain> -                    writes a plist from stdin to domain\n");
-	printf("  export <domain> <path to plist>      saves domain as a binary plist to path\n");
-	printf("  export <domain> -                    writes domain as an xml plist to stdout\n");
-	printf("  domains                              lists all domains\n");
-	// TODO: printf("  find <word>                          lists all entries containing word\n");
-	printf("  help                                 print this help\n");
-	printf("\n");
-	printf("<domain> is ( <domain_name> | -app <application_name> | -globalDomain )\n");
-	printf("         or a path to a file omitting the '.plist' extension\n");
-	printf("\n         [-container (<bundleid> | <groupid> | <path>)]\n");
-	printf("         may be specified before the domain name to change the container\n");
-	printf("         this is a Procursus extension\n");
-	printf("\n");
-	printf("<value> is one of:\n");
-	printf("  <value_rep>\n");
-	printf("  -string <string_value>\n");
-	printf("  -data <hex_digits>\n");
-	printf("  -int[eger] <integer_value>\n");
-	printf("  -float  <floating-point_value>\n");
-	printf("  -bool[ean] (true | false | yes | no)\n");
-	printf("  -date <date_rep>\n");
-	printf("  -array <value1> <value2> ...\n");
-	printf("  -array-add <value1> <value2> ...\n");
-	printf("  -dict <key1> <value1> <key2> <value2> ...\n");
-	printf("  -dict-add <key1> <value1> ...\n");
-	printf("\nContact the Procursus Team for support.\n");
-}
-
 int main(int argc, char *argv[], char *envp[])
 {
 	@autoreleasepool {
 		NSMutableArray <NSString *> *args = [[[NSProcessInfo processInfo] arguments] mutableCopy];
 
-		if (args.count == 1) {
-			usage();
-			return 255;
-		}
-
 		CFStringRef host = kCFPreferencesAnyHost;
-		if ([args[1] isEqualToString:@"-currentHost"]) {
+		if (args.count >= 2 && [args[1] isEqualToString:@"-currentHost"]) {
 			host = kCFPreferencesCurrentHost;
 			[args removeObjectAtIndex:1];
-		} else if ([args[1] isEqualToString:@"-host"]) {
+		} else if (args.count >= 3  && [args[1] isEqualToString:@"-host"]) {
 			host = (__bridge CFStringRef)args[2];
 			[args removeObjectAtIndex:2];
 			[args removeObjectAtIndex:1];
+		}
+
+		if (args.count == 1) {
+			usage();
+			return 255;
 		}
 
 		CFStringRef container = CFSTR("kCFPreferencesNoContainer");
@@ -125,8 +75,10 @@ int main(int argc, char *argv[], char *envp[])
 
 		if ([args[1] isEqualToString:@"domains"]) {
 			NSMutableArray *domains = [(__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(kCFPreferencesCurrentUser, host) mutableCopy];
-			[domains removeObjectAtIndex:[domains indexOfObject:(id)kCFPreferencesAnyApplication]];
-			[domains sortUsingSelector:@selector(compare:)];
+			if (domains.count != 0) {
+				[domains removeObjectAtIndex:[domains indexOfObject:(id)kCFPreferencesAnyApplication]];
+				[domains sortUsingSelector:@selector(compare:)];
+			}
 			printf("%s\n", [domains componentsJoinedByString:@", "].UTF8String);
 			return 0;
 		} else if (args.count == 2 && [args[1] isEqualToString:@"read"]) {
@@ -141,9 +93,30 @@ int main(int argc, char *argv[], char *envp[])
 			return 0;
 		}
 
-		if ([args[1] isEqualToString:@"find"]) {
-			// TODO: find code
-			return 1;
+		if (args.count >= 3 && [args[1] isEqualToString:@"find"]) {
+			NSArray *domains = (__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(
+					kCFPreferencesCurrentUser, host);
+			int found = 0, success = 0;
+			for (NSString *domain in domains) {
+				found = 0;
+				if ([domain rangeOfString:args[2] options:NSCaseInsensitiveSearch].location != NSNotFound)
+					found++;
+				NSDictionary *dict = (__bridge_transfer NSDictionary*)CFPreferencesCopyMultiple(NULL,
+						(__bridge CFStringRef)domain, kCFPreferencesCurrentUser, host);
+				NSArray *flattened = flatten(dict);
+				NSLog(@"%@", flattened);
+				for (NSString *item in flattened) {
+					if ([item rangeOfString:args[2] options:NSCaseInsensitiveSearch].location != NSNotFound)
+						found++;
+				}
+				if (found) {
+					success = 1;
+					printf("Found %i keys in domain '%s': %s\n", found, domain.UTF8String, dict.description.UTF8String);
+				}
+			}
+			if (!success)
+				NSLog(@"No domain, key, nor value containing '%@'", args[2]);
+			return 0;
 		}
 
 		NSString *appid;

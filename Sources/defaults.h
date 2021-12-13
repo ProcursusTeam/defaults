@@ -30,6 +30,7 @@ void usage();
 CFPropertyListRef parseTypedArg(NSString*, NSString*, bool);
 NSObject* parsePropertyList(NSString*);
 bool isType(NSString*);
+NSArray *flatten(NSObject*);
 
 /*
  * NSDateFormatter doesn't seem to work correctly,
