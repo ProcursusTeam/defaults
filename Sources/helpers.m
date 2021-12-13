@@ -78,7 +78,7 @@ NSObject* parsePropertyList(NSString* propertyList) {
 		rep = [propertyList propertyList];
 	}
 	@catch (NSException *e) {
-		fprintf(stderr, "Could not parse: %s.  Try single-quoting it.\n", propertyList.UTF8String);
+		NSLog(@"Could not parse: %@.  Try single-quoting it.\n", propertyList);
 		exit(1);
 	}
 	return rep;

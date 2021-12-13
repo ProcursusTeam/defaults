@@ -97,13 +97,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 		} else if ([args[4] isEqualToString:@"-array-add"] || [args[4] isEqualToString:@"-dict-add"]) {
 			rep = nil;
 		} else {
-			@try {
-				rep = [args[4] propertyList];
-			}
-			@catch (NSException *e) {
-				fprintf(stderr, "Could not parse: %s.  Try single-quoting it.\n", args[4].UTF8String);
-				return 1;
-			}
+			rep = parsePropertyList(args[4]);
 		}
 		if (rep != nil) {
 			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], (__bridge CFPropertyListRef)rep,

@@ -111,7 +111,10 @@ int main(int argc, char *argv[], char *envp[])
 				}
 				if (found) {
 					success = 1;
-					printf("Found %i keys in domain '%s': %s\n", found, domain.UTF8String, dict.description.UTF8String);
+					printf("Found %i keys in domain '%s': %s\n",
+							found,
+							[domain isEqualToString:(__bridge NSString *)kCFPreferencesAnyApplication]
+								? "Apple Global Domain" : domain.UTF8String, dict.description.UTF8String);
 				}
 			}
 			if (!success)
@@ -233,7 +236,7 @@ int main(int argc, char *argv[], char *envp[])
 					(__bridge CFArrayRef)keys, (__bridge CFStringRef)appid,
 					kCFPreferencesCurrentUser, host, container);
 			if (out == 0) {
-				fprintf(stderr, "The domain %s does not exist\n", appid.UTF8String);
+				NSLog(@"The domain %@ does not exist\n", appid);
 				return 1;
 			}
 			NSError *error;
@@ -249,10 +252,7 @@ int main(int argc, char *argv[], char *envp[])
 																									error:&error];
 
 			if (error) {
-				fprintf(stderr, "Could not export domain %s to %s due to %s\n",
-						appid.UTF8String,
-						args[3].UTF8String,
-						error.localizedDescription.UTF8String);
+				NSLog(@"Could not export domain %@ to %@ due to %@\n", appid, args[3], error);
 				return 1;
 			}
 			if (format == NSPropertyListXMLFormat_v1_0) {
@@ -277,7 +277,8 @@ int main(int argc, char *argv[], char *envp[])
 				inputData = [NSData dataWithContentsOfFile:args[3]];
 			}
 			if (inputData == nil) {
-				fprintf(stderr, "Could not read data from %s\n", args[3].UTF8String);
+				NSLog(@"Could not read data from %@\n", args[3]);
+				return 1;
 			}
 
 			NSError *error;
@@ -286,14 +287,12 @@ int main(int argc, char *argv[], char *envp[])
 																																					 format:0
 																																						error:&error];
 			if (error) {
-				fprintf(stderr, "Could not parse property list from %s due to %s\n",
-						args[3].UTF8String, error.localizedDescription.UTF8String);
+				NSLog(@"Could not parse property list from %@ due to %@\n", args[3], error);
 				return 1;
 			}
 
 			if (![inputDict isKindOfClass:[NSDictionary class]]) {
-				fprintf(stderr, "Property list %s was not a dictionary\nDefaults have not been changed.\n",
-						args[3].UTF8String);
+				NSLog(@"Property list %@ was not a dictionary\nDefaults have not been changed.\n", inputDict);
 				return 1;
 			}
 			for (NSString *key in [(NSDictionary*)inputData allKeys]) {
