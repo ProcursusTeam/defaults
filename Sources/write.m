@@ -116,8 +116,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
 				if (prepend != NULL) {
 					if (CFGetTypeID(prepend) != CFArrayGetTypeID()) {
-						fprintf(stderr, "Value for key %s is not an array; cannot append.  Leaving defaults unchanged.\n",
-							args[3].UTF8String);
+						NSLog(@"Value for key %@ is not an array; cannot append.  Leaving defaults unchanged.\n", args[3]);
 						return 1;
 					}
 					[array addObjectsFromArray:(__bridge_transfer NSArray*)prepend];
@@ -126,7 +125,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 			NSArray<NSString*> *arrayItems = [args subarrayWithRange:NSMakeRange(5, args.count - 5)];
 			for (int i = 0; i < arrayItems.count; i++) {
 				if ([arrayItems[i] isEqualToString:@"-array"] || [arrayItems[i] isEqualToString:@"-dict"]) {
-					fprintf(stderr, "Cannot nest composite types (arrays and dictionaries); exiting\n");
+					NSLog(@"Cannot nest composite types (arrays and dictionaries); exiting\n");
 					return 1;
 				}
 				if (isType(arrayItems[i])) {
@@ -140,14 +139,13 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 				}
 			}
 			value = (__bridge CFPropertyListRef)array;
-		} else if ([args[4] isEqualToString: @"-dict"] || [args[4] isEqualToString: @"-dict-add"]) { // Array
+		} else if ([args[4] isEqualToString: @"-dict"] || [args[4] isEqualToString: @"-dict-add"]) { // Dictionary
 			if ([args[4] isEqualToString: @"-dict-add"]) {
 				CFPropertyListRef prepend = _CFPreferencesCopyValueWithContainer((__bridge CFStringRef)args[3],
 					(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
 				if (prepend != NULL) {
 					if (CFGetTypeID(prepend) != CFDictionaryGetTypeID()) {
-						fprintf(stderr, "Value for key %s is not a dictionary; cannot append.  Leaving defaults unchanged.\n",
-							args[3].UTF8String);
+						NSLog(@"Value for key %@ is not a dictionary; cannot append.  Leaving defaults unchanged.\n", args[3]);
 						return 1;
 					}
 					[dict addEntriesFromDictionary:(__bridge_transfer NSDictionary*)prepend];
@@ -156,7 +154,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 			NSArray<NSString*> *arrayItems = [args subarrayWithRange:NSMakeRange(5, args.count - 5)];
 			for (int i = 0; i < arrayItems.count; i++) {
 				if ([arrayItems[i] isEqualToString:@"-array"] || [arrayItems[i] isEqualToString:@"-dict"]) {
-					fprintf(stderr, "Cannot nest composite types (arrays and dictionaries); exiting\n");
+					NSLog(@"Cannot nest composite types (arrays and dictionaries); exiting\n");
 					return 1;
 				}
 				if (isType(arrayItems[i])) {
@@ -167,12 +165,12 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 							usage();
 							return 255;
 						} else
-							fprintf(stderr, "Dictionary keys must be strings\n");
+							NSLog(@"Dictionary keys must be strings\n");
 						return 1;
 					}
 				}
 				if (i == arrayItems.count - 1) {
-					fprintf(stderr, "Key %s lacks a corresponding value\n", arrayItems[i].UTF8String);
+					NSLog(@"Key %@ lacks a corresponding value\n", arrayItems[i]);
 					return 1;
 				}
 				if (isType(arrayItems[i + 1])) {
@@ -190,13 +188,18 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 				}
 			}
 			value = (__bridge CFPropertyListRef)dict;
-		}
-		if (value == NULL)
+		} else {
 			value = parseTypedArg(args[4], args[5], false);
-		else if (args.count > 6 && array.count == 0 && dict.count == 0) {
-			fprintf(stderr, "Unexpected argument %s; leaving defaults unchanged.\n", args[5].UTF8String);
-			return 1;
+
+			if (isType(args[4]) && args.count >= 7) {
+				NSLog(@"Unexpected argument %@; leaving defaults unchanged.\n", args[6]);
+				return 1;
+			} else if (!isType(args[4]) && args.count >= 6) {
+				NSLog(@"Unexpected argument %@; leaving defaults unchanged.\n", args[5]);
+				return 1;
+			}
 		}
+
 		_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], value,
 			(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
 		_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);

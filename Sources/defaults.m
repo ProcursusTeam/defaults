@@ -138,7 +138,7 @@ int main(int argc, char *argv[], char *envp[])
 					}
 				}
 				if (appid == nil) {
-					fprintf(stderr, "Couldn't find an application named \"%s\"; defaults unchanged\n", args[3].UTF8String);
+					NSLog(@"Couldn't find an application named \"%@\"; defaults unchanged\n", args[3]);
 					return 1;
 				}
 				[args removeObjectAtIndex:2];
@@ -174,10 +174,9 @@ int main(int argc, char *argv[], char *envp[])
 			CFPropertyListRef value = _CFPreferencesCopyValueWithContainer((__bridge CFStringRef)args[3],
 					(__bridge CFStringRef)appid, kCFPreferencesCurrentUser, host, container);
 			if (value == NULL) {
-				fprintf(stderr, "Key %s does not exist in domain %s; leaving defaults unchanged\n",
-						args[3].UTF8String,
+				NSLog(@"Key %@ does not exist in domain %@; leaving defaults unchanged\n", args[3],
 						[appid isEqualToString:(__bridge NSString*)kCFPreferencesAnyApplication]
-							? "Apple Global Domain" : appid.UTF8String);
+							? @"Apple Global Domain" : appid);
 				return 1;
 			}
 			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[4], value, (__bridge CFStringRef)appid,
