@@ -28,6 +28,13 @@
 #import "NSData+HexString.h"
 #include "defaults.h"
 
+NSString *prettyName(NSString *name) {
+	if ([name isEqualToString:(__bridge NSString *)kCFPreferencesAnyApplication])
+		return @"Apple Global Domain";
+	else
+		return name;
+}
+
 CFPropertyListRef parseTypedArg(NSString *type, NSString *value, bool inArray) {
 	if (type == NULL) {
 		if (inArray && ([value characterAtIndex:0] == '{' || [value characterAtIndex:0] == '('))
@@ -78,7 +85,7 @@ NSObject* parsePropertyList(NSString* propertyList) {
 		rep = [propertyList propertyList];
 	}
 	@catch (NSException *e) {
-		NSLog(@"Could not parse: %@.  Try single-quoting it.\n", propertyList);
+		NSLog(@"Could not parse: %@.  Try single-quoting it.", propertyList);
 		exit(1);
 	}
 	return rep;

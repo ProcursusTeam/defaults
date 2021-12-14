@@ -31,6 +31,7 @@ CFPropertyListRef parseTypedArg(NSString*, NSString*, bool);
 NSObject* parsePropertyList(NSString*);
 bool isType(NSString*);
 NSArray *flatten(NSObject*);
+NSString *prettyName(NSString *);
 
 /*
  * NSDateFormatter doesn't seem to work correctly,
@@ -59,3 +60,6 @@ CFPropertyListRef _CFPreferencesCopyValueWithContainer(CFStringRef key, CFString
 void _CFPreferencesSetMultipleWithContainer(CFDictionaryRef keysToSet, CFArrayRef keysToRemove, CFStringRef applicationID, CFStringRef userName, CFStringRef hostName, CFStringRef container);
 void _CFPreferencesSetValueWithContainer(CFStringRef key, CFPropertyListRef value, CFStringRef applicationID, CFStringRef userName, CFStringRef hostName, CFStringRef container);
 Boolean _CFPreferencesSynchronizeWithContainer(CFStringRef applicationID, CFStringRef userName, CFStringRef hostName, CFStringRef container);
+void _CFPrefsSetSynchronizeIsSynchronous(int);
+void _CFPrefsSynchronizeForProcessTermination(void);
+void _CFPrefSetInvalidPropertyListDeletionEnabled(int);

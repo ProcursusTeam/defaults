@@ -52,7 +52,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 		NSObject* rep = parsePropertyList(args[3]);
 
 		if (![rep isKindOfClass:[NSDictionary class]]) {
-			fprintf(stderr, "Rep argument is not a dictionary\nDefaults have not been changed.\n");
+			NSLog(@"\nRep argument is not a dictionary\nDefaults have not been changed.\n");
 			return 1;
 		}
 
@@ -79,6 +79,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 		}
 		_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident, kCFPreferencesCurrentUser,
 				host, container);
+		_CFPrefsSynchronizeForProcessTermination();
 		return 0;
 	}
 
@@ -102,8 +103,13 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 		if (rep != nil) {
 			_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], (__bridge CFPropertyListRef)rep,
 				(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
-			_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident, kCFPreferencesCurrentUser,
-					host, container);
+			Boolean ret = _CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident,
+					kCFPreferencesCurrentUser, host, container);
+			_CFPrefsSynchronizeForProcessTermination();
+			if (!ret) {
+				NSLog(@"Could not write domain %@; exiting", prettyName(ident));
+				return 1;
+			}
 		}
 		return 0;
 	} else if (args.count >= 6) {
@@ -125,7 +131,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 			NSArray<NSString*> *arrayItems = [args subarrayWithRange:NSMakeRange(5, args.count - 5)];
 			for (int i = 0; i < arrayItems.count; i++) {
 				if ([arrayItems[i] isEqualToString:@"-array"] || [arrayItems[i] isEqualToString:@"-dict"]) {
-					NSLog(@"Cannot nest composite types (arrays and dictionaries); exiting\n");
+					NSLog(@"Cannot nest composite types (arrays and dictionaries); exiting");
 					return 1;
 				}
 				if (isType(arrayItems[i])) {
@@ -203,6 +209,7 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 		_CFPreferencesSetValueWithContainer((__bridge CFStringRef)args[3], value,
 			(__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
 		_CFPreferencesSynchronizeWithContainer((__bridge CFStringRef)ident, kCFPreferencesCurrentUser, host, container);
+		_CFPrefsSynchronizeForProcessTermination();
 		return 0;
 	}
 
