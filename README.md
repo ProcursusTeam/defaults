@@ -4,7 +4,7 @@ Opensource re-implementation of `defaults(1)`
 ### Additions:
 * `-container` - The official `defaults(1)` does not have appropriate support for containers.
 
-### Help
+### Help:
 ```
 Command line interface to a user's defaults.
 Syntax:
