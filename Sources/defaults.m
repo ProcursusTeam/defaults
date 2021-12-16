@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-const unsigned char defaultsVersionString[] = "@(#)PROGRAM:defaults  PROJECT:defaults-1.0  BUILT:" __DATE__ " " __TIME__ "\n";
+const unsigned char defaultsVersionString[] = "@(#)PROGRAM:defaults  PROJECT:defaults-0.1  BUILT:" __DATE__ " " __TIME__ "\n";
 
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
