@@ -102,7 +102,7 @@ int main(int argc, char *argv[], char *envp[])
 			NSArray *domains = (__bridge_transfer NSArray*)CFPreferencesCopyApplicationList(
 					kCFPreferencesCurrentUser, host);
 			long found = 0;
-			bool success = false;
+			BOOL success = false;
 			for (NSString *domain in domains) {
 				found = 0;
 				if ([domain rangeOfString:args[2] options:NSCaseInsensitiveSearch].location != NSNotFound)

@@ -83,8 +83,6 @@ int defaultsWrite(NSArray<NSString *> *args, NSString *ident, CFStringRef host, 
 		return 0;
 	}
 
-	NSString *key = args[3];
-
 	if (args.count == 5) {
 		NSObject *rep;
 		// Should probably clean this up
