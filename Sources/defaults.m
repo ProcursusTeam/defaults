@@ -133,7 +133,7 @@ int main(int argc, char *argv[], char *envp[])
 					[args[2] isEqualToString:@"NSGlobalDomain"] || [args[2] isEqualToString:@"Apple Global Domain"])
 				appid = (__bridge NSString*)kCFPreferencesAnyApplication;
 			else if (args.count >= 4 && [args[2] isEqualToString:@"-app"]) {
-				bool directory;
+				BOOL directory;
 				if ([[NSFileManager defaultManager] fileExistsAtPath:args[3] isDirectory:&directory] && directory) {
 					NSBundle *appBundle = [NSBundle bundleWithPath:[args[3] stringByResolvingSymlinksInPath]];
 					if (appBundle == nil) {
@@ -256,7 +256,6 @@ int main(int argc, char *argv[], char *envp[])
 			}
 			NSError *error;
 			NSPropertyListFormat format = NSPropertyListBinaryFormat_v1_0;
-			NSURL *outURL;
 			if ([args[3] isEqualToString:@"-"]) {
 				format = NSPropertyListXMLFormat_v1_0;
 			}
