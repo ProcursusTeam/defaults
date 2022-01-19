@@ -1,6 +1,9 @@
 CC      ?= xcrun cc
+STRIP   ?= xcrun strip
 CFLAGS  ?= -O2
 LDFLAGS ?= -O2
+
+LDID    ?= ldid
 
 SRC := Sources/defaults.m Sources/write.m
 SRC += Sources/helpers.m
@@ -10,7 +13,8 @@ all: defaults
 
 defaults: $(SRC:%=%.o)
 	$(CC) $(LDFLAGS) -o $@ $^ -framework CoreFoundation -framework MobileCoreServices -fobjc-arc
-	-ldid -Sent.plist $@
+	$(STRIP) $@
+	-$(LDID) -Sent.plist $@
 
 %.m.o: %.m
 	$(CC) $(CFLAGS) -c -o $@ $< -fobjc-arc

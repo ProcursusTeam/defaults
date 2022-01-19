@@ -1,0 +1,71 @@
+name: build
+on:
+  push:
+    paths:
+      - '*.m'
+      - '*.h'
+      - '.github/workflows/*'
+      - 'Makefile'
+  pull_request:
+    paths:
+      - '*.c'
+      - '*.cpp'
+      - '.github/workflows/*'
+      - 'Makefile'
+  workflow_dispatch:
+  release:
+    types:
+      - created
+
+jobs:
+  build-macos:
+    runs-on: macos-11
+    strategy:
+      matrix:
+        target:
+        - iphoneos
+        - watchos
+        - appletvos
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+
+    - name: setup environment
+      run: |
+        if [ "${TARGET}" = "watchos" ]; then
+          ARCH="arm64_32"
+        else
+          ARCH="arm64"
+        fi
+        echo "CC=xcrun -sdk ${TARGET} cc -arch ${ARCH}" >> $GITHUB_ENV
+        echo "STRIP=xcrun -sdk ${TARGET} strip" >> $GITHUB_ENV
+        echo "CFLAGS=-Os -flto=thin -m${TARGET}-version-min=7.0" >> $GITHUB_ENV
+        echo "LDFLAGS=-Os -flto=thin -m${TARGET}-version-min=7.0" >> $GITHUB_ENV
+        gh run download -R ProcursusTeam/ldid -n ldid_macos_x86_64
+        chmod +x ldid
+        echo "LDID=./ldid" >> $GITHUB_ENV
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: build
+      run: |
+        make -j$(sysctl -n hw.ncpu)
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: defaults_${{ matrix.target }}
+        path: defaults
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      if: ${{ github.event_name == 'release' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: defaults
+        asset_name: defaults_${{ matrix.target }}
+        asset_content_type: application/octet-stream
