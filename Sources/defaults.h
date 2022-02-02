@@ -26,7 +26,7 @@
 #import <Foundation/Foundation.h>
 
 int defaultsWrite(NSArray*, NSString*, CFStringRef, CFStringRef);
-void usage();
+void usage(void);
 CFPropertyListRef parseTypedArg(NSString*, NSString*, bool);
 NSObject* parsePropertyList(NSString*);
 bool isType(NSString*);

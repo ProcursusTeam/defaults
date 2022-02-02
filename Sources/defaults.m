@@ -241,7 +241,11 @@ int main(int argc, char *argv[], char *envp[])
 		}
 
 		if ([args[1] isEqualToString:@"export"]) {
-			if (args.count == 3) {
+			if (args.count < 3) {
+				usage();
+				return 255;
+			}
+			if (args.count < 4) {
 				NSLog(@"\nNeed a path to write to");
 				return 1;
 			}
@@ -278,7 +282,11 @@ int main(int argc, char *argv[], char *envp[])
 		}
 
 		if ([args[1] isEqualToString:@"import"]) {
-			if (args.count == 3) {
+			if (args.count < 3) {
+				usage();
+				return 255;
+			}
+			if (args.count < 4) {
 				NSLog(@"\nNeed a path to read from");
 				return 1;
 			}
